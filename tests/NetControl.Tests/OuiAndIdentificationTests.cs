@@ -46,7 +46,11 @@ namespace NetControl.Tests
                 Name = "MyLinuxBox"
             };
 
-            Assert.Equal($"{Environment.MachineName} (Local Host)", localPc.DeviceLabel);
+            // Reverse-DNS (in-addr.arpa) hostnames must not leak into the label;
+            // it should fall back to the machine name and mark the device as local.
+            Assert.DoesNotContain("in-addr.arpa", localPc.DeviceLabel, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("1.1.168.192", localPc.DeviceLabel);
+            Assert.EndsWith("(Local Host)", localPc.DeviceLabel.TrimEnd('…'));
         }
 
         [Fact]

@@ -20,9 +20,6 @@ jobs:
           - os: windows-latest
             rid: win-x64
             archive: zip
-          - os: macos-13
-            rid: osx-x64
-            archive: tar.gz
           - os: macos-latest
             rid: osx-arm64
             archive: tar.gz
