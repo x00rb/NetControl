@@ -1,0 +1,85 @@
+name: Build NetControl
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+            archive: tar.gz
+          - os: windows-latest
+            rid: win-x64
+            archive: zip
+          - os: macos-13
+            rid: osx-x64
+            archive: tar.gz
+          - os: macos-latest
+            rid: osx-arm64
+            archive: tar.gz
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore NetControl.sln
+
+      - name: Build
+        run: dotnet build NetControl.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test NetControl.sln -c Release --no-build --no-restore
+
+      - name: Publish
+        run: dotnet publish NetControl/NetControl.csproj -c Release -r ${{ matrix.rid }} --self-contained -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o dist/${{ matrix.rid }}
+
+      - name: Package (Unix)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          set -e
+          RID="${{ matrix.rid }}"
+          OUT="NetControl-${RID}.tar.gz"
+          if [ "$RID" = "linux-x64" ]; then
+            cp -f netcontrol.desktop "dist/$RID/" 2>/dev/null || true
+            cp -f netcontrol.png "dist/$RID/" 2>/dev/null || true
+          fi
+          cd "dist/$RID"
+          tar -czf "../../$OUT" .
+          cd ../..
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$OUT" > "${OUT}.sha256"
+          else
+            shasum -a 256 "$OUT" > "${OUT}.sha256"
+          fi
+
+      - name: Package (Windows)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $rid = "${{ matrix.rid }}"
+          $zip = "NetControl-$rid.zip"
+          if (Test-Path $zip) { Remove-Item $zip }
+          Compress-Archive -Path "dist\$rid\*" -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Out-File -Encoding ascii "${zip}.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetControl-${{ matrix.rid }}
+          path: NetControl-${{ matrix.rid }}.*

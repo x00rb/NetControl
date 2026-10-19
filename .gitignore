@@ -91,3 +91,8 @@ workflows/
 evals/
 templates/
 iconos/
+
+# Allow GitHub Actions workflows
+!.github/
+!.github/workflows/
+!.github/workflows/**
